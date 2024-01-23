@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>City AQI Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map {
+      height: 500px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>City AQI Map</h1>
+  <label for="year">Select Year:</label>
+  <select id="year" onchange="updateMap()">
+    <!-- Add options for each year in your dataset -->
+    <option value="2015">2015</option>
+    <option value="2016">2016</option>
+    <option value="2017">2017</option>
+    <option value="2018">2018</option>
+    <option value="2019">2019</option>
+    <option value="2020">2020</option>
+    <!-- Add more options as needed based on your dataset -->
+  </select>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.1.0/chroma.min.js"></script>
+
+
+  <script>
+    const cities = [
+      "Ahmedabad",
+      "Aizawl",
+      "Amaravati",
+      "Amritsar",
+      "Bengaluru",
+      "Bhopal",
+      "Brajrajnagar",
+      "Chandigarh",
+      "Chennai",
+      "Coimbatore",
+      "Delhi",
+      "Ernakulam",
+      "Gurugram",
+      "Guwahati",
+      "Hyderabad",
+      "Jaipur",
+      "Jorapokhar",
+      "Kochi",
+      "Kolkata",
+      "Lucknow",
+      "Mumbai",
+      "Patna",
+      "Shillong",
+      "Talcher",
+      "Thiruvananthapuram",
+      "Visakhapatnam"
+    ];
+
+    const apiKey = "b24c631814364142955219d882e1d830"; // Replace with your OpenCage API key
+
+    let selectedYear;
+    let map;
+    let markersLayer;
+
+    async function getLatLongs() {
+      const latLongs = {};
+
+      for (const city of cities) {
+        const response = await fetch(`https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(city)}&key=${apiKey}`);
+        const data = await response.json();
+
+        if (data.results && data.results.length > 0) {
+          const { lat, lng } = data.results[0].geometry;
+          latLongs[city] = { lat, lng };
+        } else {
+          console.error(`Unable to fetch coordinates for ${city}`);
+        }
+      }
+
+      return latLongs;
+    }
+
+    async function loadCSV() {
+      const response = await fetch('city_data1.csv');
+      const csvData = await response.text();
+      return Papa.parse(csvData, { header: true }).data;
+    }
+
+    function updateMap() {
+      // Remove existing layers before updating
+      if (map) {
+        map.eachLayer(layer => {
+          if (layer !== markersLayer) {
+            map.removeLayer(layer);
+          }
+        });
+      }
+
+      // Get the selected year from the dropdown
+      selectedYear = document.getElementById('year').value;
+
+      // Example usage
+      Promise.all([getLatLongs(), loadCSV()]).then(([latLongs, cityData]) => {
+        // Initialize the map if not already initialized
+        if (!map) {
+          const indiaBounds = [
+            [6.753515, 68.162385], // Southwest corner (latitude, longitude)
+            [35.508700, 97.395358] // Northeast corner (latitude, longitude)
+          ];
+
+          map = L.map('map', {
+            center: [20.5937, 78.9629],
+            zoom: 5,
+            zoomControl: false, // Disable the default zoom control
+            maxBounds: indiaBounds,
+            maxBoundsViscosity: 1.0
+          });
+
+          // Add a base map layer
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+          }).addTo(map);
+        }
+
+        // Add markers for each city with AQI information for the selected year
+        markersLayer = L.layerGroup().addTo(map);
+
+        const geoJsonData = {
+          type: 'FeatureCollection',
+          features: []
+        };
+
+        for (const city in latLongs) {
+          const { lat, lng } = latLongs[city];
+
+          // Filter city data for the current city and selected year
+          const cityAqiData = cityData
+            ?.filter(entry => entry.City === city && entry.Date?.includes(selectedYear));
+
+          if (cityAqiData.length > 0) {
+            // Get AQI for the current city
+            const aqiValue = parseFloat(cityAqiData[0].AQI);
+
+            // Add feature to GeoJSON data
+            geoJsonData.features.push({
+              type: 'Feature',
+              properties: {
+                city,
+                aqi: aqiValue
+              },
+              geometry: {
+                type: 'Point',
+                coordinates: [lng, lat]
+              }
+            });
+
+            // Create marker with popup
+            const marker = L.marker([lat, lng]).addTo(markersLayer);
+            marker.bindPopup(`${city}<br>AQI: ${aqiValue.toFixed(2)}`);
+          } else {
+            console.error(`No AQI data found for ${city} in ${selectedYear}`);
+          }
+        }
+
+        // Create GeoJSON layer with color-scaled features
+        L.geoJSON(geoJsonData, {
+          pointToLayer: (feature, latlng) => {
+            const aqiValue = feature.properties.aqi;
+            const color = getColorBasedOnAqi(aqiValue);
+            return L.circleMarker(latlng, {
+              radius: 8,
+              fillColor: color,
+              color: '#000',
+              weight: 1,
+              opacity: 1,
+              fillOpacity: 0.8
+            });
+          },
+          onEachFeature: (feature, layer) => {
+            layer.bindPopup(`${feature.properties.city}<br>AQI: ${feature.properties.aqi.toFixed(2)}`);
+          }
+        }).addTo(map);
+      });
+    }
+
+    function getColorBasedOnAqi(aqiValue) {
+      // You can customize the color scale here
+      const colorScale = chroma.scale('OrRd').domain([0, 500]); // Adjust the domain based on your AQI range
+      return colorScale(aqiValue).hex();
+    }
+
+    // Initial map update
+    updateMap();
+  </script>
+</body>
+
+</html>

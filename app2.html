@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pollutant Contribution Bar Chart</title>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <style>
+    /* Add your styles here if needed */
+    .tooltip {
+      position: absolute;
+      text-align: center;
+      padding: 5px;
+      font: 12px sans-serif;
+      background: #ddd;
+      border: 1px solid #aaa;
+      border-radius: 5px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+    <h1>Pollutant levels in a city</h1>
+  <div>
+    <label for="citySelect">Select City:</label>
+    <select id="citySelect"></select>
+
+    <label for="pollutantSelect">Select Pollutant:</label>
+    <select id="pollutantSelect"></select>
+  </div>
+
+  <div id="barChart"></div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script>
+    d3.csv("city_data1.csv").then((data, error) => {
+      if (error) throw error;
+
+      // Extract unique cities and pollutants
+      const cities = [...new Set(data.map(d => d.City))];
+      const pollutants = Object.keys(data[0]).filter(key => key !== "City" && key !== "Date");
+
+      // Populate city select dropdown
+      d3.select("#citySelect")
+        .selectAll("option")
+        .data(cities)
+        .enter()
+        .append("option")
+        .text(d => d);
+
+      // Populate pollutant select dropdown
+      d3.select("#pollutantSelect")
+        .selectAll("option")
+        .data(pollutants)
+        .enter()
+        .append("option")
+        .text(d => d);
+
+      // Initial values for city and pollutant
+      const initialCity = cities[0];
+      const initialPollutant = pollutants[0];
+
+      // Set initial selected values
+      d3.select("#citySelect").property("value", initialCity);
+      d3.select("#pollutantSelect").property("value", initialPollutant);
+
+      // Draw the initial bar chart
+      updateBarChart(initialCity, initialPollutant);
+
+      // Handle dropdown changes
+      d3.select("#citySelect").on("change", updateChart);
+      d3.select("#pollutantSelect").on("change", updateChart);
+
+      function updateChart() {
+        const selectedCity = d3.select("#citySelect").property("value");
+        const selectedPollutant = d3.select("#pollutantSelect").property("value");
+
+        updateBarChart(selectedCity, selectedPollutant);
+      }
+
+      function updateBarChart(city, pollutant) {
+        // Filter data based on selected city and pollutant
+        const filteredData = data.filter(d => d.City === city);
+
+        // Group data by year and calculate sum for each year
+        const yearlyData = d3.nest()
+          .key(d => new Date(d.Date).getFullYear())
+          .rollup(values => d3.sum(values, d => d[pollutant]))
+          .entries(filteredData);
+
+        // Clear existing chart
+        d3.select("#barChart").html("");
+
+        // Set up chart dimensions
+        const margin = { top: 20, right: 20, bottom: 60, left: 60 };
+        const width = 800 - margin.left - margin.right;
+        const height = 500 - margin.top - margin.bottom;
+
+        // Create SVG element
+        const svg = d3.select("#barChart")
+          .append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+          .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Create x and y scales
+        const xScale = d3.scaleBand()
+          .domain(yearlyData.map(d => d.key))
+          .range([0, width])
+          .padding(0.1);
+
+        const yScale = d3.scaleLinear()
+          .domain([0, d3.max(yearlyData, d => d.value)])
+          .range([height, 0]);
+
+        // Create x and y axes
+        const xAxis = d3.axisBottom(xScale);
+        const yAxis = d3.axisLeft(yScale);
+
+        // Append x axis to chart
+        svg.append("g")
+          .attr("transform", `translate(0,${height})`)
+          .call(xAxis);
+
+        // Append y axis to chart
+        svg.append("g")
+          .call(yAxis);
+
+        // Create bars
+        svg.selectAll(".bar")
+          .data(yearlyData)
+          .enter()
+          .append("rect")
+          .attr("class", "bar")
+          .attr("x", d => xScale(d.key))
+          .attr("y", d => yScale(d.value))
+          .attr("width", xScale.bandwidth())
+          .attr("height", d => height - yScale(d.value))
+          .attr("fill", "steelblue")
+          .on("mouseover", function (d) {
+            const tooltip = d3.select("#tooltip");
+            tooltip.html(`<strong>${d.key}</strong><br>${pollutant}: ${d.value}`)
+              .style("left", (d3.event.pageX + 10) + "px")
+              .style("top", (d3.event.pageY - 20) + "px")
+              .style("opacity", 1);
+          })
+          .on("mouseout", function () {
+            d3.select("#tooltip").style("opacity", 0);
+          });
+      }
+    });
+  </script>
+
+</body>
+
+</html>

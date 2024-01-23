@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Top Cities Comparison by AQI Bar Chart</title>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  
+  <style>
+    /* Add your styles here if needed */
+    .tooltip {
+      position: absolute;
+      text-align: center;
+      padding: 5px;
+      font: 12px sans-serif;
+      background: #ddd;
+      border: 1px solid #aaa;
+      border-radius: 5px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+   <h1>Top Poor and great air quality Indian cities</h1>
+  <div>
+    <label for="yearSelect">Select Year:</label>
+    <select id="yearSelect">
+      <option value="2015">2015</option>
+      <option value="2016">2016</option>
+      <option value="2017">2017</option>
+      <option value="2018">2018</option>
+      <option value="2019">2019</option>
+      <option value="2020">2020</option>
+    </select>
+  </div>
+
+  <div id="comparisonChart"></div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script>
+    d3.csv("city_data1.csv").then((data, error) => {
+      if (error) throw error;
+
+      // Initial value for year
+      const initialYear = "2015";
+
+      // Set initial selected value
+      d3.select("#yearSelect").property("value", initialYear);
+
+      // Draw the initial bar chart
+      updateComparisonChart(initialYear);
+
+      // Handle dropdown changes
+      d3.select("#yearSelect").on("change", updateChart);
+
+      function updateChart() {
+        const selectedYear = d3.select("#yearSelect").property("value");
+
+        updateComparisonChart(selectedYear);
+      }
+
+      function updateComparisonChart(year) {
+        // Filter data based on the selected year
+        const filteredData = data.filter(d => new Date(d.Date).getFullYear().toString() === year);
+
+        // Group data by city and find the average AQI and pollutant contributions for each city
+        const cityAvgValues = d3.nest()
+          .key(d => d.City)
+          .rollup(values => {
+            const avgAQI = d3.mean(values, d => d.AQI);
+            const pollutantContributions = {};
+            ["PM2.5", "PM10", "NO", "NO2", "NOx", "NH3", "CO", "SO2", "O3", "Benzene", "Toluene", "Xylene"].forEach(pollutant => {
+              pollutantContributions[pollutant] = d3.mean(values, d => d[pollutant]);
+            });
+            return { avgAQI, pollutantContributions };
+          })
+          .entries(filteredData);
+
+        // Sort cities based on average AQI values in descending order
+        cityAvgValues.sort((a, b) => b.value.avgAQI - a.value.avgAQI);
+
+        // Select the top five and bottom five cities
+        const topFiveCities = cityAvgValues.slice(0, 5);
+        const bottomFiveCities = cityAvgValues.slice(-5);
+
+        // Combine the top and bottom cities
+        const selectedCities = topFiveCities.concat(bottomFiveCities);
+
+        // Clear existing chart
+        d3.select("#comparisonChart").html("");
+
+        // Set up chart dimensions
+        const margin = { top: 20, right: 20, bottom: 60, left: 60 };
+        const width = 800 - margin.left - margin.right;
+        const height = 500 - margin.top - margin.bottom;
+
+        // Create SVG element
+        const svg = d3.select("#comparisonChart")
+          .append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+          .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Create x and y scales
+        const xScale = d3.scaleBand()
+          .domain(selectedCities.map(d => d.key))
+          .range([0, width])
+          .padding(0.1);
+
+        const yScale = d3.scaleLinear()
+          .domain([0, d3.max(selectedCities, d => d.value.avgAQI)])
+          .range([height, 0]);
+
+        // Create x and y axes
+        const xAxis = d3.axisBottom(xScale);
+        const yAxis = d3.axisLeft(yScale);
+
+        // Append x axis to chart
+        svg.append("g")
+          .attr("transform", `translate(0,${height})`)
+          .call(xAxis)
+          .selectAll("text")
+          .style("text-anchor", "end")
+          .attr("transform", "rotate(-45)");
+
+        // Append y axis to chart
+        svg.append("g")
+          .call(yAxis);
+
+        // Create bars
+        svg.selectAll(".bar")
+          .data(selectedCities)
+          .enter()
+          .append("rect")
+          .attr("class", "bar")
+          .attr("x", d => xScale(d.key))
+          .attr("y", d => yScale(d.value.avgAQI))
+          .attr("width", xScale.bandwidth())
+          .attr("height", d => height - yScale(d.value.avgAQI))
+          .attr("fill", d => d.value.avgAQI === 0 ? "lightgray" : (d.value.avgAQI >= 100 ? "red" : "green"))
+          .on("mouseover", function (d) {
+            const tooltip = d3.select("#tooltip");
+            const pollutantInfo = Object.entries(d.value.pollutantContributions)
+              .map(([pollutant, contribution]) => `<strong>${pollutant}:</strong> ${contribution.toFixed(2)}`)
+              .join("<br>");
+            tooltip.html(`<strong>${d.key}</strong><br>Average AQI: ${d.value.avgAQI.toFixed(2)}<br>${pollutantInfo}`)
+              .style("left", (d3.event.pageX + 10) + "px")
+              .style("top", (d3.event.pageY - 20) + "px")
+              .style("opacity", 1);
+          })
+          .on("mouseout", function () {
+            d3.select("#tooltip").style("opacity", 0);
+          });
+      }
+    });
+  </script>
+
+</body>
+
+</html>
