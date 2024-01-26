@@ -2,6 +2,14 @@
 ## Abstract
 Monitoring pollution is crucial for the well-being of our planet. This repository compiles pollutant measurements across 26 cities in India from 2015 to 2020. Explore daily readings of parameters like PM2.5, PM10, NO, NO2, NOx, NH3, CO, SO2, O3, Benzene, Toluene, Xylene, AQI, and AQI Bucket.
 ### Dataset Source : Kaggle
+**Tech Stack:**
+
+- **Python:** Data preprocessing and cleaning.
+- **Pandas:** Handling and manipulating the dataset.
+- **HTML, JS, CSS:** Creating an interactive and visually appealing webpage.
+- **D3.js:** Dynamic and interactive data visualizations.
+- **GitHub Pages:** Hosting the visualization page for easy sharing and access.
+
 ## Data Description
 Date: Daily readings (2015-2020).
 Parameters: PM2.5, PM10, NO, NO2, NOx, NH3, CO, SO2, O3, Benzene, Toluene, Xylene, AQI, AQI Bucket.
