@@ -15,10 +15,11 @@ Created two DataFrames (df and df1) from city_day.csv and city_hour.csv.
 Saved cleaned data to "City_data1.csv."
 
 ## Steps to Run the Code
-Preprocess the data using Python.
-Create an HTML page with required titles and spacing for visualizations.
-Implement visualization code using HTML, JS, CSS, and D3.
-Embed D3 visualizations into specific HTML.
-Bind all visualizations together using an iframe in "map.html" for a seamless viewing experience.
+- **Preprocess the Data:** Use Python for data preprocessing.
+- **HTML Page Setup:** Create an HTML page with titles and spacing for visualizations.
+- **Visualization Implementation:** Implement visualization code using HTML, JS, CSS, and D3.
+- **Embed Visualizations:** Embed D3 visualizations into specific HTML.
+- **Bind Visualizations:** Use an iframe in "map.html" for a seamless viewing experience.
+
 
 
